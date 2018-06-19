@@ -1,13 +1,13 @@
 /**
  *  D-Link DCS-5222L
- *  Build 2017081801
+ *  Build 2018050902
  *
  *  Adapted from Ben Lebson's (GitHub: blebson) D-Link DCS-5222L v1.0.4 device handler that is designed to work with
  *  his "D-Link Camera Manager" SmartApp.
  *
  *  Ben Lebson's system was based on Patrick Stuart's (patrick@patrickstuart.com) "Generic Video Camera" SmartApp.
  *
- *  Copyright 2017 Jordan Markwell
+ *  Copyright 2018 Jordan Markwell
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -20,21 +20,25 @@
  *
  *  ChangeLog:
  *      
- *      Earlier:
- *          Consolidated parent/child system down to standard device handler system
- *          Added ability to store position state
- *      
- *      2017081701:
- *          Corrected usage of CameraIP/VideoIP and CameraPort/VideoPort preferences
- *          Added, "moveLock" attribute to support movement locking functionality
- *      
- *      2017081801:
- *          Added moveLockOn()/moveLockOff() functions to support the new moveLock attribute
+ *      20180509
+ *          01: The moveLock system is now a component of the device handler.
+ *          02: Code cleanup.
  *
+ *      20170818
+ *          01: Added moveLockOn()/moveLockOff() functions to support the new moveLock attribute.
+ *
+ *      20170817
+ *          01: Corrected usage of CameraIP/VideoIP and CameraPort/VideoPort preferences.
+ *          02: Added, "moveLock" attribute to support movement locking functionality.
+ *
+ *      Earlier:
+ *          Creation
+ *          Consolidated parent/child system down to standard device handler system.
+ *          Added ability to store position state.
  */
+
 metadata {
     definition (name: "DCS-5222L", author: "Jordan Markwell", namespace: "jmarkwell") {
-       
         capability "Image Capture"
         capability "Sensor"
         capability "Switch"
@@ -45,13 +49,12 @@ metadata {
         capability "Video Camera"
         capability "Video Capture"
         
-        attribute "hubactionMode", "string"
-        attribute "switch2", "string"
-        attribute "switch3", "string"
-        attribute "switch4", "string"
-        attribute "switch5", "string"
-        attribute "switch6", "string"
-        attribute "moveLock", "string"
+        attribute "switch2", "string" // PIR on/off
+        attribute "switch3", "string" // night vision on/off
+        attribute "switch4", "string" // recording on/off
+        attribute "switch5", "string" // camera status on/off
+        attribute "PTZPos", "string"
+        attribute "moveLockTime", "number"
         
         command "pirOn"
         command "pirOff"
@@ -75,7 +78,6 @@ metadata {
         command "vidOff"
         command "configure"
         command "moveLockOn"
-        command "moveLockOff"
     }
     
     preferences {
@@ -144,35 +146,35 @@ metadata {
             state "toggle", label:'toggle', action: "", icon: "st.motion.buttons.rec", backgroundColor: "#53a7c0"
             state "on", label: 'PIR On', action: "pirOff", icon: "st.custom.buttons.rec", backgroundColor: "#EE0000", nextState: "toggle"
         }
-        standardTile("up", "device.switch6", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false, decoration: "flat") {
+        standardTile("up", "device.PTZPos", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false, decoration: "flat") {
             state "up", label: "", action: "up", icon: "st.samsung.da.oven_ic_up", nextState: "moving"
             state "moving", label: "moving", action:"", backgroundColor: "#53a7c0", icon: "st.samsung.da.oven_ic_up"
         }
-        standardTile("left", "device.switch6", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false, decoration: "flat") {
+        standardTile("left", "device.PTZPos", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false, decoration: "flat") {
             state "left", label: "", action: "left", icon: "st.samsung.da.RAC_4line_01_ic_left", nextState: "moving"
             state "moving", label: "moving", action:"", backgroundColor: "#53a7c0", icon: "st.samsung.da.RAC_4line_01_ic_left"
         }
-        standardTile("home", "device.switch6", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false) {
+        standardTile("home", "device.PTZPos", width: 1, height: 1, canChangeIcon: false, canChangeBackground: false) {
             state "home", label: "Home", action: "home", icon: "st.Home.home2", nextState: "moving"
             state "moving", label: "moving", action:"", backgroundColor: "#53a7c0", icon: "st.Home.home2"
         }
-        standardTile("right", "device.switch6", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false, decoration: "flat") {
+        standardTile("right", "device.PTZPos", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false, decoration: "flat") {
             state "right", label: "", action: "right", icon: "st.samsung.da.RAC_4line_03_ic_right", nextState: "moving"
             state "moving", label: "moving", action:"", backgroundColor: "#53a7c0", icon: "st.samsung.da.RAC_4line_03_ic_right"
         }
-        standardTile("down", "device.switch6", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false, decoration: "flat") {
+        standardTile("down", "device.PTZPos", width: 1, height: 1, canChangeIcon: false, canChangeBackground: false, decoration: "flat") {
             state "down", label: "", action: "down", icon: "st.samsung.da.oven_ic_down", nextState: "moving"
             state "moving", label: "moving", action:"", backgroundColor: "#53a7c0", icon: "st.samsung.da.oven_ic_down"
         }
-        standardTile("presetOne", "device.switch6", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false) {
+        standardTile("presetOne", "device.PTZPos", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false) {
             state "presetOne", label: "1", action: "presetOne", nextState: "moving"
-            state "moving", label: "moving", action:"", backgroundColor: "#53a7c0"            
+            state "moving", label: "moving", action:"", backgroundColor: "#53a7c0"
         }
-        standardTile("presetTwo", "device.switch6", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false) {
+        standardTile("presetTwo", "device.PTZPos", width: 1, height: 1, canChangeIcon: false, canChangeBackground: false) {
             state "presetTwo", label: "2", action: "presetTwo", nextState: "moving"
             state "moving", label: "moving", action:"", backgroundColor: "#53a7c0"
         }
-        standardTile("presetThree", "device.switch6", width: 1, height: 1, canChangeIcon: false,  canChangeBackground: false) {
+        standardTile("presetThree", "device.PTZPos", width: 1, height: 1, canChangeIcon: false, canChangeBackground: false) {
             state "presetThree", label: "3", action: "presetThree", nextState: "moving"
             state "moving", label: "moving", action:"", backgroundColor: "#53a7c0"
         }
@@ -191,8 +193,8 @@ metadata {
             state "level", action:"switch level.setLevel"
         }
         standardTile("videoStart", "device.image", width: 1, height: 1, inactiveLabel: false) {
-            state "start", action:"start", icon:"st.Entertainment.entertainment11"        
-        }        
+            state "start", action:"start", icon:"st.Entertainment.entertainment11"
+        }
         valueTile("Sensitivity", "device.level", width: 1, height: 1, inactiveLabel: false){
             state "default", label:'${currentValue}%', unit:"%"
         }
@@ -204,6 +206,7 @@ metadata {
 
 def parse(String description) {
     log.debug "Parsing ${description}"
+    
     if (description != "updated") {
         def map = [:]
         def retResult = []
@@ -216,10 +219,12 @@ def parse(String description) {
         if (descMap["tempImageKey"]) {
             try {
                 storeTemporaryImage( descMap.tempImageKey, getPictureName() )
-            } catch(Exception e) {
+            }
+            catch(Exception e) {
                 log.error e
             }
-        } else if (descMap["headers"] && descMap["body"]){
+        }
+        else if (descMap["headers"] && descMap["body"]){
             def body = new String( descMap["body"].decodeBase64() )
             log.debug "Body: ${body}"
         }
@@ -236,7 +241,8 @@ def parse(String description) {
             if ( msg.body.contains("enable=yes") ) {
                 log.debug "Motion is on"
                 sendEvent(name: "switch", value: "on");
-            } else if ( msg.body.contains("enable=no") ) {
+            }
+            else if ( msg.body.contains("enable=no") ) {
                 log.debug "Motion is off"
                 sendEvent(name: "switch", value: "off");
             }
@@ -244,7 +250,8 @@ def parse(String description) {
             if ( msg.body.contains("pir=yes") ) {
                 log.debug "PIR is on"
                 sendEvent(name: "switch2", value: "on");
-            } else if ( msg.body.contains("pir=no") ) {
+            }
+            else if ( msg.body.contains("pir=no") ) {
                 log.debug "PIR is off"
                 sendEvent(name: "switch2", value: "off");
             }
@@ -265,10 +272,12 @@ def parse(String description) {
             if ( msg.body.contains( "mode=night") ) {
                 log.debug "Night Vision is on"
                 sendEvent(name: "switch3", value: "on");
-            } else if ( msg.body.contains("mode=day") ) {
+            }
+            else if ( msg.body.contains("mode=day") ) {
                 log.debug "Night Vision is off"
                 sendEvent(name: "switch3", value: "off");
-            } else if ( msg.body.contains("mode=auto") ) {
+            }
+            else if ( msg.body.contains("mode=auto") ) {
                 log.debug "Night Vision is auto"
                 sendEvent(name: "switch3", value: "auto");
             }
@@ -276,14 +285,15 @@ def parse(String description) {
             if ( msg.body.contains("<record><enable>0</enable>") ) {
                 log.debug "Video Recording Disabled"
                 sendEvent(name: "switch4", value: "off");
-            } else if ( msg.body.contains("<record><enable>1</enable>") ) {
+            }
+            else if ( msg.body.contains("<record><enable>1</enable>") ) {
                 log.debug "Video Recording Enabled"
                 sendEvent(name: "switch4", value: "on");
             }    
             
             if ( msg.body.contains("<code>ok</code>") & !msg.body.contains("<record><enable>0</enable>") & !msg.body.contains("<record><enable>1</enable>") ) {
                 log.debug "Camera has arrived at ${state.requestedPosition} position"
-                sendEvent(name: "switch6", value: "${state.requestedPosition}");
+                sendEvent(name: "PTZPos", value: "${state.requestedPosition}");
             }
         }
         device.deviceNetworkId = "ID_WILL_BE_CHANGED_AT_RUNTIME_" + (Math.abs( new Random().nextInt() ) % 99999 + 1)
@@ -297,8 +307,8 @@ def take() {
     def host = CameraIP 
     def hosthex = convertIPtoHex(host)
     def porthex = convertPortToHex(CameraPort)
-    device.deviceNetworkId = "$hosthex:$porthex" 
     
+    device.deviceNetworkId = "$hosthex:$porthex"
     log.debug "The device id configured is: $device.deviceNetworkId"
     
     def path = "/image/jpeg.cgi" 
@@ -306,12 +316,10 @@ def take() {
     
     def headers = [:] 
     headers.put("HOST", "$host:$CameraPort")
-       headers.put("Authorization", userpass)
-    
+    headers.put("Authorization", userpass)
     log.debug "The Header is $headers"
     
-    def method = "GET"    
-    
+    def method = "GET"
     log.debug "The method is $method"
     
     try {
@@ -324,7 +332,8 @@ def take() {
         hubAction.options = [outputMsgToS3:true]
         log.debug hubAction
         hubAction
-    } catch (Exception e) {
+    }
+    catch(Exception e) {
         log.debug "Hit Exception $e on $hubAction"
     }
 }
@@ -335,19 +344,19 @@ def motionCmd(int motion, String attr) {
     def host = CameraIP 
     def hosthex = convertIPtoHex(host)
     def porthex = convertPortToHex(CameraPort)
-    device.deviceNetworkId = "$hosthex:$porthex" 
     
+    device.deviceNetworkId = "$hosthex:$porthex"
     log.debug "The device id configured is: $device.deviceNetworkId"
     
     def headers = [:] 
     headers.put("HOST", "$host:$CameraPort")
     headers.put("Authorization", userpass)
-    
     log.debug "The Header is $headers"
     
     if (motion == 1) {
         def path = "/config/motion.cgi?${attr}=yes"
         log.debug "path is: $path"
+        
         try {
             def hubAction = new physicalgraph.device.HubAction(
                 method: "GET",
@@ -356,23 +365,27 @@ def motionCmd(int motion, String attr) {
             )
             
             log.debug hubAction
-            return hubAction
-        } catch (Exception e) {
+            return(hubAction)
+        }
+        catch(Exception e) {
             log.debug "Hit Exception $e on $hubAction"
         }
-    } else {
+    }
+    else {
         def path = "/config/motion.cgi?${attr}=no"
-        log.debug "path is: $path"  
+        log.debug "path is: $path"
+        
         try {
             def hubAction = new physicalgraph.device.HubAction(
                 method: "GET",
                 path: path,
-                headers: headers        
+                headers: headers
             )
             
             log.debug hubAction
-            return hubAction
-        } catch (Exception e) {
+            return(hubAction)
+        }
+        catch(Exception e) {
             log.debug "Hit Exception $e on $hubAction"
         }
     }
@@ -384,20 +397,20 @@ def sensitivityCmd(int percent) {
     def host = CameraIP 
     def hosthex = convertIPtoHex(host)
     def porthex = convertPortToHex(CameraPort)
-    device.deviceNetworkId = "$hosthex:$porthex" 
     
+    device.deviceNetworkId = "$hosthex:$porthex"
     log.debug "The device id configured is: $device.deviceNetworkId"
     
     def pir_percent = []
-        
     if (percent <= 33) {
         pir_percent = 0
-    } else if (percent > 33 && percent < 66) {
+    }
+    else if (percent > 33 && percent < 66) {
         pir_percent = 50
-    } else if (percent >= 66) {
+    }
+    else if (percent >= 66) {
         pir_percent = 100
     }
-    
     log.debug "Sensitivity is ${percent} and PIR Sensitivity is ${pir_percent}"
     
     def path = "/config/motion.cgi?sensitivity=${percent}&pir_sensitivity=${pir_percent}"
@@ -406,7 +419,6 @@ def sensitivityCmd(int percent) {
     def headers = [:] 
     headers.put("HOST", "$host:$CameraPort")
     headers.put("Authorization", userpass)
-    
     log.debug "The Header is $headers"
    
     try {
@@ -417,8 +429,9 @@ def sensitivityCmd(int percent) {
         )
         
         log.debug hubAction
-        return hubAction
-    } catch (Exception e) {
+        return(hubAction)
+    }
+    catch(Exception e) {
         log.debug "Hit Exception $e on $hubAction"
     }
 }
@@ -429,18 +442,18 @@ def nightCmd(String attr) {
     def host = CameraIP 
     def hosthex = convertIPtoHex(host)
     def porthex = convertPortToHex(CameraPort)
-    device.deviceNetworkId = "$hosthex:$porthex" 
     
+    device.deviceNetworkId = "$hosthex:$porthex"
     log.debug "The device id configured is: $device.deviceNetworkId"
     
     def headers = [:] 
     headers.put("HOST", "$host:$CameraPort")
     headers.put("Authorization", userpass)
-    
     log.debug "The Header is $headers"
     
     def path = "/config/icr.cgi?mode=${attr}"
     log.debug "path is: $path"
+    
     try {
         def hubAction = new physicalgraph.device.HubAction(
             method: "GET",
@@ -449,8 +462,9 @@ def nightCmd(String attr) {
         )
         
         log.debug hubAction
-        return hubAction
-    } catch (Exception e) {
+        return(hubAction)
+    }
+    catch(Exception e) {
         log.debug "Hit Exception $e on $hubAction"
     }
 }
@@ -461,18 +475,18 @@ def videoCmd(int attr) {
     def host = CameraIP 
     def hosthex = convertIPtoHex(host)
     def porthex = convertPortToHex(CameraPort)
-    device.deviceNetworkId = "$hosthex:$porthex" 
     
+    device.deviceNetworkId = "$hosthex:$porthex"
     log.debug "The device id configured is: $device.deviceNetworkId"
     
     def headers = [:] 
     headers.put("HOST", "$host:$CameraPort")
     headers.put("Authorization", userpass)
-    
     log.debug "The Header is $headers"
     
     def path = "/cgi/admin/recorder.cgi?recordEnable=${attr}&continuous=${attr}"
     log.debug "path is: $path"
+    
     try {
         def hubAction = new physicalgraph.device.HubAction(
             method: "GET",
@@ -481,10 +495,11 @@ def videoCmd(int attr) {
         )
         
         log.debug hubAction
-        return hubAction
-    } catch (Exception e) {
+        return(hubAction)
+    }
+    catch(Exception e) {
         log.debug "Hit Exception $e on $hubAction"
-    }  
+    }
 }
 
 def parseDescriptionAsMap(description) {
@@ -501,7 +516,7 @@ private getPictureName() {
     return picName
 }
 
-private String convertIPtoHex(ipAddress) { 
+private String convertIPtoHex(ipAddress) {
     String hex = ipAddress.tokenize( '.' ).collect {  String.format( '%02x', it.toInteger() ) }.join()
     log.debug "IP address entered is $ipAddress and the converted hex code is $hex"
     return hex
@@ -535,13 +550,13 @@ private getHostAddress() {
 
 def on() {
     log.debug "Enabling motion detection"
-    return motionCmd(1, "enable")    
+    return motionCmd(1, "enable")
     
 }
 
 def off() {
     log.debug "Disabling motion detection"
-    return motionCmd(0, "enable")    
+    return motionCmd(0, "enable")
     
 }
 def pirOn() {
@@ -558,7 +573,7 @@ def pirOff() {
 
 def setLevel(percent) {
     log.debug "Executing 'setLevel'"
-    return sensitivityCmd(percent)    
+    return sensitivityCmd(percent)
     
 }
 def nvOn() {
@@ -569,24 +584,24 @@ def nvOn() {
 
 def nvOff() {
     log.debug "Disabling Night Vision"
-    return nightCmd("day")    
+    return nightCmd("day")
     
 }
 
 def nvAuto() {
     log.debug "Automatic Night Vision"
-    return nightCmd("auto")    
+    return nightCmd("auto")
     
 }
 
 def vrOn() {
     log.debug "Video Recording On"
-    return videoCmd(1) 
+    return videoCmd(1)
 }
 
 def vrOff() {
     log.debug "Video Recording Off"
-    return videoCmd(0) 
+    return videoCmd(0)
 }
 
 def refresh() {
@@ -596,16 +611,16 @@ def refresh() {
     def host = CameraIP 
     def hosthex = convertIPtoHex(host)
     def porthex = convertPortToHex(CameraPort)
-    device.deviceNetworkId = "$hosthex:$porthex" 
     
+    device.deviceNetworkId = "$hosthex:$porthex"
     log.debug "The device id configured is: $device.deviceNetworkId"
+    
     def path = "/config/motion.cgi"
     log.debug "path is: $path"
     
     def headers = [:] 
     headers.put("HOST", "$host:$CameraPort")
     headers.put("Authorization", userpass)
-    
     log.debug "The Header is $headers"
    
     try {
@@ -616,8 +631,9 @@ def refresh() {
         )
     
         log.debug hubAction
-        return hubAction
-    } catch (Exception e) {
+        return(hubAction)
+    }
+    catch(Exception e) {
         log.debug "Hit Exception $e on $hubAction"
     }
 }
@@ -628,8 +644,8 @@ def moveCmd(int moveX, int moveY) {
     def host = CameraIP 
     def hosthex = convertIPtoHex(host)
     def porthex = convertPortToHex(CameraPort)
-    device.deviceNetworkId = "$hosthex:$porthex" 
     
+    device.deviceNetworkId = "$hosthex:$porthex"
     log.debug "The device id configured is: $device.deviceNetworkId"
     
     def path = "/cgi/ptdc.cgi?command=set_relative_pos&posX=${moveX}&posY=${moveY}"
@@ -638,7 +654,6 @@ def moveCmd(int moveX, int moveY) {
     def headers = [:] 
     headers.put("HOST", "$host:$CameraPort")
     headers.put("Authorization", userpass)
-    
     log.debug "The Header is $headers"
     
     try {
@@ -649,78 +664,83 @@ def moveCmd(int moveX, int moveY) {
         )
         
         log.debug hubAction
-        return hubAction
-    } catch (Exception e) {
+        return(hubAction)
+    }
+    catch(Exception e) {
         log.debug "Hit Exception $e on $hubAction"
     }
   
 }
 def presetCmd(preset) {
-    def userpassascii = "${CameraUser}:${CameraPassword}"
-    def userpass = "Basic " + userpassascii.encodeAsBase64().toString()
-    def host = CameraIP 
-    def hosthex = convertIPtoHex(host)
-    def porthex = convertPortToHex(CameraPort)
-    def presetIndex = (preset - 1)
-    device.deviceNetworkId = "$hosthex:$porthex" 
-    
-    log.debug "The device id configured is: $device.deviceNetworkId"
-    
-    def path = "/cgi/ptdc.cgi?command=goto_preset_position&index=${presetIndex}"
-    log.debug "path is: $path"
-    
-    def headers = [:] 
-    headers.put("HOST", "$host:$CameraPort")
-    headers.put("Authorization", userpass)
-    
-    log.debug "The Header is $headers"
-    
-    try {
-        def hubAction = new physicalgraph.device.HubAction(
-            method: "GET",
-            path: path,
-            headers: headers
-        )
+    def moveLockTime = device.currentValue("moveLockTime") ?: 0
+    if (now() > moveLockTime) {
+        def userpassascii = "${CameraUser}:${CameraPassword}"
+        def userpass = "Basic " + userpassascii.encodeAsBase64().toString()
+        def host = CameraIP 
+        def hosthex = convertIPtoHex(host)
+        def porthex = convertPortToHex(CameraPort)
+        def presetIndex = (preset - 1)
         
-        log.debug hubAction
-        return hubAction
-    }
-    catch (Exception e) {
-        log.debug "Hit Exception $e on $hubAction"
+        device.deviceNetworkId = "$hosthex:$porthex"
+        log.debug "The device id configured is: $device.deviceNetworkId"
+        
+        def path = "/cgi/ptdc.cgi?command=goto_preset_position&index=${presetIndex}"
+        log.debug "path is: $path"
+        
+        def headers = [:] 
+        headers.put("HOST", "$host:$CameraPort")
+        headers.put("Authorization", userpass)
+        log.debug "The Header is $headers"
+        
+        try {
+            def hubAction = new physicalgraph.device.HubAction(
+                method: "GET",
+                path: path,
+                headers: headers
+            )
+            
+            log.debug hubAction
+            return(hubAction)
+        }
+        catch(Exception e) {
+            log.debug "Hit Exception $e on $hubAction"
+        }
     }
 }
 
 def homeCmd() {
-    def userpassascii = "${CameraUser}:${CameraPassword}"
-    def userpass = "Basic " + userpassascii.encodeAsBase64().toString()
-    def host = CameraIP 
-    def hosthex = convertIPtoHex(host)
-    def porthex = convertPortToHex(CameraPort)
-    device.deviceNetworkId = "$hosthex:$porthex" 
-    
-    log.debug "The device id configured is: $device.deviceNetworkId"
-    
-    def path = "/cgi/ptdc.cgi?command=go_home"
-    log.debug "path is: $path"
-    
-    def headers = [:] 
-    headers.put("HOST", "$host:$CameraPort")
-    headers.put("Authorization", userpass)
-    
-    log.debug "The Header is $headers"
-    
-    try {
-        def hubAction = new physicalgraph.device.HubAction(
-            method: "GET",
-            path: path,
-            headers: headers
-        )
+    def moveLockTime = device.currentValue("moveLockTime") ?: 0
+    if (now() > moveLockTime) {
+        def userpassascii = "${CameraUser}:${CameraPassword}"
+        def userpass = "Basic " + userpassascii.encodeAsBase64().toString()
+        def host = CameraIP 
+        def hosthex = convertIPtoHex(host)
+        def porthex = convertPortToHex(CameraPort)
         
-        log.debug hubAction
-        return hubAction
-    }
-    catch (Exception e) {
-        log.debug "Hit Exception $e on $hubAction"
+        device.deviceNetworkId = "$hosthex:$porthex"
+        log.debug "The device id configured is: $device.deviceNetworkId"
+        
+        def path = "/cgi/ptdc.cgi?command=go_home"
+        log.debug "path is: $path"
+        
+        def headers = [:] 
+        headers.put("HOST", "$host:$CameraPort")
+        headers.put("Authorization", userpass)
+        log.debug "The Header is $headers"
+        
+        try {
+            def hubAction = new physicalgraph.device.HubAction(
+                method: "GET",
+                path: path,
+                headers: headers
+            )
+            
+            log.debug hubAction
+            return(hubAction)
+        }
+        catch(Exception e) {
+            log.debug "Hit Exception $e on $hubAction"
+        }
     }
 }
 
@@ -850,17 +870,14 @@ def updated() {
 }
 
 def configure() {
-    sendEvent(name:"switch5", value:"on")    
+    sendEvent(name:"switch5", value:"on")
 }
 
 def getInHomeURL() {
    [InHomeURL: "rtsp://${CameraUser}:${CameraPassword}@${CameraIP}:${CameraPort}/live1.sdp"]
 }
 
-def moveLockOn() {
-    sendEvent(name:"moveLock", value:"on")
-}
-
-def moveLockOff() {
-    sendEvent(name:"moveLock", value:"off")
+def moveLockOn(seconds) {
+    def moveLockTime = now() + (1000 * seconds)
+    sendEvent(name: "moveLockTime", value: moveLockTime)
 }
